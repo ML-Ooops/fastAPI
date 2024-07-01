@@ -33,3 +33,6 @@ def new_words():
 def job_seekers():
     recommendations = recommend_for_job_seekers()
     return {"recommendations": recommendations}
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
