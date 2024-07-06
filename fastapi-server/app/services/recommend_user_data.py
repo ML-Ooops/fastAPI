@@ -8,6 +8,7 @@ def update_interest_vector(interest_vector, new_interests, increment=0.1, decrem
         if new_interests[i] == 1:
             interest_vector[i] += increment
     
+    interest_vector = np.minimum(interest_vector, 1.0)
     
     for i in range(len(interest_vector)):
         if new_interests[i] == 0:
