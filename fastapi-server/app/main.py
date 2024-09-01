@@ -1,8 +1,12 @@
 from random import random
-import uvicorn
-from fastapi import FastAPI
+from typing import Optional
 
-from dto.RecommendDTO import NewsRecommendationDTO_Req
+import numpy as np
+import uvicorn
+from fastapi import FastAPI, Query, HTTPException
+from sklearn.metrics.pairwise import cosine_similarity
+
+from dto.RecommendDTO import NewsRecommendationDTO_Req, recommend_news_similarity_InputData
 from services.recommend_user_data import update_interest_vector, find_similar_items
 from dto.userCategory import UserUpdateDTO_Res, UserUpdateDTO_Req
 from services.recommend import (
@@ -13,6 +17,7 @@ from services.recommend import (
     recommend_for_job_seekers
 )
 from services.news_category_jsonStructure import *
+
 
 from services.searchNews import fetch_all_news
 
@@ -51,10 +56,10 @@ def job_seekers():
 async def get_news():
     return await fetch_all_news(news_item_helper)
 
+# retrun category of each news
 @app.get("/news_category", response_model=List[Dict])
 async def get_news_category():
     return await fetch_all_news(news_Category_helper)
-
 
 # @app.get("/news_recommendation", response_model=List[Dict])
 # async def get_news_recommendation(data : NewsRecommendationDTO_Req):
@@ -69,13 +74,38 @@ async def get_news_category():
 #
 #     return
 
+@app.post("/news/recommend/similarity")
+async def recommend_news_similarity(input_data: recommend_news_similarity_InputData):
+    news_data=await fetch_all_news(news_Category_helper);
+    input_vector = np.array(input_data.category_array).reshape(1, -1)
+    news_vectors = np.array([news['category_array'] for news in news_data])
+    similarities = cosine_similarity(input_vector, news_vectors).flatten()
+    similar_news = sorted(zip(news_data, similarities), key=lambda x: x[1], reverse=True)
+    top_similar_news = similar_news[:input_data.top_n]
+    return [
+        {
+            "news_id": news[0]["news_id"],
+            "similarity": news[1]
+        } for news in top_similar_news
+    ]
 
+@app.get("/news/{news_id}/")
+async def get_news_by_id(news_id: str):
+    # news_id를 기반으로 뉴스 데이터 검색
+    for news in await fetch_all_news(news_item_helper):
+        if news["news_id"] == news_id:
+            return news
+    raise HTTPException(status_code=404, detail="News not found")
+
+# 사용자 카테고리 벡터와 뉴스 id를 기반으로 카테고리 벡터를 업데이트
+# 뉴스 아이디에서 벡터 추출과정 추가해야됨.
 @app.get("/news_user_update", response_model=UserUpdateDTO_Res)
 async def get_news_recommendation(data: UserUpdateDTO_Req):
     response_data = UserUpdateDTO_Res(
         new_user_category=update_interest_vector(data.user_category, data.new_category)
     )
     return response_data
+
 
 
 
