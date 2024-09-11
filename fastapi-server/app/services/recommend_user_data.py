@@ -14,7 +14,7 @@ def update_interest_vector(interest_vector, new_interests, increment=0.1, decrem
         if new_interests[i] == 0:
             interest_vector[i] = (interest_vector[i] - decrement) ** 2
     
-    return interest_vector
+    return [round(value, 2) for value in interest_vector.tolist()]
 
 # user_based recommendation, content_based recommendation
 def combine_vectors(keyword_vector, field_vector, media_vector):

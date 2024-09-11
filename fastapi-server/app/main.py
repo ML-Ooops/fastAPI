@@ -74,7 +74,7 @@ async def get_news_category():
 #
 #     return
 
-@app.post("/news/recommend/similarity")
+@app.post("/news/content/similarity_recommend")
 async def recommend_news_similarity(input_data: recommend_news_similarity_InputData):
     news_data=await fetch_all_news(news_Category_helper);
     input_vector = np.array(input_data.category_array).reshape(1, -1)
@@ -101,10 +101,16 @@ async def get_news_by_id(news_id: str):
 # 뉴스 아이디에서 벡터 추출과정 추가해야됨.
 @app.get("/news_user_update", response_model=UserUpdateDTO_Res)
 async def get_news_recommendation(data: UserUpdateDTO_Req):
-    response_data = UserUpdateDTO_Res(
-        new_user_category=update_interest_vector(data.user_category, data.new_category)
-    )
-    return response_data
+    response_data=None;
+    for news in await fetch_all_news(news_Category_helper):
+        if news["news_id"] == data.news_id:
+            temp = new_user_category=update_interest_vector(data.user_category, list(news["category_array"]));
+            response_data = UserUpdateDTO_Res(
+                news_user_category=temp
+            )
+            return response_data
+    raise HTTPException(status_code=404, detail="News not found")
+
 
 
 
