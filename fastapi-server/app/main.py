@@ -1,4 +1,4 @@
-from random import random
+import random
 from typing import Optional
 
 import numpy as np
@@ -6,7 +6,8 @@ import uvicorn
 from fastapi import FastAPI, Query, HTTPException
 from sklearn.metrics.pairwise import cosine_similarity
 
-from dto.RecommendDTO import NewsRecommendationDTO_Req, recommend_news_similarity_InputData
+from dto.RecommendDTO import NewsRecommendationDTO_Req, recommend_news_similarity_InputData, \
+    recommend_news_random_InputData
 from services.recommend_user_data import update_interest_vector, find_similar_items
 from dto.userCategory import UserUpdateDTO_Res, UserUpdateDTO_Req
 from services.recommend import (
@@ -52,11 +53,13 @@ def job_seekers():
 
 
 # return all news
+# clear : (전체 뉴스 조회)
 @app.get("/news", response_model=List[Dict])
 async def get_news():
     return await fetch_all_news(news_item_helper)
 
 # retrun category of each news
+# clear : (전체 뉴스 카테고리(index) 조회)
 @app.get("/news_category", response_model=List[Dict])
 async def get_news_category():
     return await fetch_all_news(news_Category_helper)
@@ -74,6 +77,7 @@ async def get_news_category():
 #
 #     return
 
+# clear : 사용자 과심카테고리(index)를 바탕으로 content-based 추천방식
 @app.post("/news/content/similarity_recommend")
 async def recommend_news_similarity(input_data: recommend_news_similarity_InputData):
     news_data=await fetch_all_news(news_Category_helper);
@@ -88,7 +92,23 @@ async def recommend_news_similarity(input_data: recommend_news_similarity_InputD
             "similarity": news[1]
         } for news in top_similar_news
     ]
+# clear : 랜덤하게 지정된 개수만큼 뉴스를 반환.
+@app.post("/news/content/random_recommend")
+async def recommend_news_similarity(input_data: recommend_news_random_InputData):
+    news_data = await fetch_all_news(news_Category_helper)
 
+    # 전체 뉴스 데이터에서 랜덤하게 top_n 개수만큼 선택
+    random_news = random.sample(news_data, min(input_data.top_n, len(news_data)))
+
+    return [
+        {
+            "news_id": news["news_id"]
+        } for news in random_news
+    ]
+
+
+
+# clear : 특정 뉴스 id 를 기반으로 뉴스 탐색.
 @app.get("/news/{news_id}/")
 async def get_news_by_id(news_id: str):
     # news_id를 기반으로 뉴스 데이터 검색
@@ -98,18 +118,22 @@ async def get_news_by_id(news_id: str):
     raise HTTPException(status_code=404, detail="News not found")
 
 # 사용자 카테고리 벡터와 뉴스 id를 기반으로 카테고리 벡터를 업데이트
-# 뉴스 아이디에서 벡터 추출과정 추가해야됨.
-@app.get("/news_user_update", response_model=UserUpdateDTO_Res)
+# clear
+@app.post("/user_category_update", response_model=UserUpdateDTO_Res)
 async def get_news_recommendation(data: UserUpdateDTO_Req):
-    response_data=None;
+    print(data.user_category)
+    print(data.news_id)
     for news in await fetch_all_news(news_Category_helper):
         if news["news_id"] == data.news_id:
-            temp = new_user_category=update_interest_vector(data.user_category, list(news["category_array"]));
+            temp = new_user_category=update_interest_vector(data.user_category, news["category_array"])
             response_data = UserUpdateDTO_Res(
                 news_user_category=temp
             )
             return response_data
     raise HTTPException(status_code=404, detail="News not found")
+
+
+
 
 
 
