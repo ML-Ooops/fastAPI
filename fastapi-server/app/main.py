@@ -7,7 +7,7 @@ from fastapi import FastAPI, Query, HTTPException
 from sklearn.metrics.pairwise import cosine_similarity
 
 from dto.RecommendDTO import NewsRecommendationDTO_Req, recommend_news_similarity_InputData, \
-    recommend_news_random_InputData
+    recommend_news_random_InputData, recommend_user_similarity_InputData
 from services.recommend_user_data import update_interest_vector, find_similar_items
 from dto.userCategory import UserUpdateDTO_Res, UserUpdateDTO_Req
 from services.recommend import (
@@ -64,19 +64,6 @@ async def get_news():
 async def get_news_category():
     return await fetch_all_news(news_Category_helper)
 
-# @app.get("/news_recommendation", response_model=List[Dict])
-# async def get_news_recommendation(data : NewsRecommendationDTO_Req):
-#     #할일 : 현재 어떤 사용자의 어떤 부분을 반영할지를 정하지 않음. 이부분을 다시 반영해야할듯.
-#
-#     result=fetch_all_news(news_Category_helper)
-#     #할일 : 위의 결과를 처리해서 벡터만 있는 list로 변환해야함.
-#
-#     similar_item_indices, similar_item_scores= find_similar_items(data.user_category, result, top_n=data.num)
-#
-#     # 할일 : similar_item_indices로 뉴스 순서에 대한 검색을 진행해서 검색된 결과를 반환.
-#
-#     return
-
 # clear : 사용자 과심카테고리(index)를 바탕으로 content-based 추천방식
 @app.post("/news/content/similarity_recommend")
 async def recommend_news_similarity(input_data: recommend_news_similarity_InputData):
@@ -94,10 +81,8 @@ async def recommend_news_similarity(input_data: recommend_news_similarity_InputD
     ]
 # clear : 랜덤하게 지정된 개수만큼 뉴스를 반환.
 @app.post("/news/content/random_recommend")
-async def recommend_news_similarity(input_data: recommend_news_random_InputData):
+async def recommend_news_random(input_data: recommend_news_random_InputData):
     news_data = await fetch_all_news(news_Category_helper)
-
-    # 전체 뉴스 데이터에서 랜덤하게 top_n 개수만큼 선택
     random_news = random.sample(news_data, min(input_data.top_n, len(news_data)))
 
     return [
@@ -105,8 +90,21 @@ async def recommend_news_similarity(input_data: recommend_news_random_InputData)
             "news_id": news["news_id"]
         } for news in random_news
     ]
+@app.post("/news/content/user_recommend")
+async def recommend_user_similarity(input_data: recommend_user_similarity_InputData):
+    user_vector = np.array(input_data.user_list).reshape(1, -1)
+    user_record_vectors = np.array(input_data.user_record_list)
 
+    similarities = cosine_similarity(user_vector, user_record_vectors).flatten()
+    most_similar_user_indices = np.argsort(similarities)[::-1]
+    similar_users = [
+        {
+            "user_index": int(index),
+            "similarity": float(similarities[index])
+        } for index in most_similar_user_indices
+    ]
 
+    return similar_users
 
 # clear : 특정 뉴스 id 를 기반으로 뉴스 탐색.
 @app.get("/news/{news_id}/")
@@ -121,8 +119,6 @@ async def get_news_by_id(news_id: str):
 # clear
 @app.post("/user_category_update", response_model=UserUpdateDTO_Res)
 async def get_news_recommendation(data: UserUpdateDTO_Req):
-    print(data.user_category)
-    print(data.news_id)
     for news in await fetch_all_news(news_Category_helper):
         if news["news_id"] == data.news_id:
             temp = new_user_category=update_interest_vector(data.user_category, news["category_array"])
