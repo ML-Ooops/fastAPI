@@ -12,6 +12,9 @@ class NewsRecommendationDTO_Req(BaseModel):
         arbitrary_types_allowed = True
 
 
+class NewsById_Req(BaseModel):
+    news_ids: List[str]
+
 class recommend_news_similarity_InputData(BaseModel):
     category_array: List[float]
     top_n: int
